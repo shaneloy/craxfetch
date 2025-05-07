@@ -496,11 +496,11 @@ int main(int argc, char *argv[]) {
             printf("  -v, --version    Show version info\n");
             printf("  -h, --help       Show this help message\n");
             printf("  Run without flags to display system info and retro shenanigans.\n");
-	    printf("\n  Feeling -l337, --l337 ? Don't run that command ;)\n");
+	    printf("\n  Feeling -1337 or -l337 ? Don't run that command ;)\n");
             return 0;
         }
     }
-if (argc > 1 && (strcmp(argv[1], "--1337") == 0 || strcmp(argv[1], "-1337") == 0)) {
+if (argc > 1 && (strcmp(argv[1], "-l337") == 0 || strcmp(argv[1], "-1337") == 0)) {
     const char* bbom_quotes[] = {
         "“Ignorance is curable, stupid is forever.” – BBoM",
         "“Accessing data like it's 1999.”",
