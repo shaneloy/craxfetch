@@ -21,7 +21,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  */
-// Includes live here
+/* Includes live here */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,11 +29,13 @@
 #include <sys/utsname.h>
 #include <time.h>
 #include <pwd.h>
-#include <limits.h> // For HOST_NAME_MAX
+#include <limits.h>
 #include <sys/types.h>
+#include <sys/statvfs.h>
 
-// Defines live here
-#define CRAXFETCH_VERSION "CraxFetch-v0.1-alpha - CraxBank Edition"
+/* Defines live here */
+#define CRAXFETCH_VERSION "CraxFetch-v0.1-alpha - CraxBank Edition" /* Thinking of protecting this or adding something else so I know it's my base */
+//#define CRAXFETCH_CREATOR "Shane (DayTripper) Austnet #Lismore"
 #define RED "\033[0;31m"
 #define RESET   "\033[0m"
 #define CYAN    "\033[36m"
@@ -45,7 +47,10 @@
 #define RUN_COUNT_FILE "/tmp/.craxfetch_count"
 
 const char* moods[] = {
-    // Hacker Culture / Matrix / Cyberpunk
+/*
+ * This is where all my cool quotes will live
+ *
+ */
     "In God we trust, all others we root.",
     "There is no spoon.",
     "Welcome to the desert of the real.",
@@ -58,8 +63,6 @@ const char* moods[] = {
     "Mood: Awaiting the singularity.",
     "Warning: Reality.exe not found.",
     "Booted in 'no gods, no sysadmins' mode.",
-
-    // Big Book of Mischief / Hackers Handbook / Classic Mischief
     "Mood: Running from the feds since '96.",
     "Current status: Building blue boxes out of chewing gum and paperclips.",
     "Tip: Payphones hate 2600 Hz tones.",
@@ -70,8 +73,6 @@ const char* moods[] = {
     "Mood: Port scanned your toaster for fun.",
     "Your IP has been forwarded to Santa.",
     "System alert: Too many l33t packets detected.",
-
-    // Satirical System States
     "Server is vibing on port 1337.",
     "Mood: Grungy but functional.",
     "Motto: Patch nothing, fear everything.",
@@ -82,8 +83,6 @@ const char* moods[] = {
     "Error 418: Mood is a teapot.",
     "CPU temperature: Running hot from all the bad decisions.",
     "Filesystem status: Slightly haunted.",
-
-    // Vintage IRC / BBS Vibes
     "Mood: +o on #phreakz.",
     "Currently wardialing random suburbs.",
     "Active botnet: 42 eggdrops and a dream.",
@@ -91,8 +90,6 @@ const char* moods[] = {
     "Quote of the day: 'All your base are belong to us.'",
     "BBS connection stable. ANSI art loading...",
     "Message from root: Stop poking the daemon.",
-
-    // Random Shenanigans
     "Mood: Running Doom on the fridge.",
     "Reality buffer overflow.",
     "Mood: Staring into the void (it's blinking back).",
@@ -104,14 +101,24 @@ const char* moods[] = {
     "Mood: That one scene in Hackers where everything explodes.",
     "This system proudly maintained by paranoia and vim macros.",
 };
-
+/*
+ * It's a little game I've got, whenever I hear a good line or think
+ * something up, I add it here, I must admit I'm pretty proud of these
+ */
 const char* get_random_tagline() {
     static const char* taglines[] = {
+	"Coded with confusion. Compiled with despair. Debugged with profanity."
+	"Sponsored by the Ministry of Bad Decisions™."
+	"CraxBank – Spawning child processes like rabbits.",
+	"CraxBank – Powered by forgotten root passwords.",
+	"CraxBank – Because chmod 777 solves everything.",
+	"CraxBank – Resistance is futile. We've got root.",
+	"CraxBank – Not tested on humans. Or even compiled properly.",
         "CraxBank - Where all good girls come to cry",
         "CraxBank - Unauthorized access encouraged.",
         "CraxBank - No logs. No witnesses.",
         "CraxBank - Trust us, we're unstable.",
-        "CraxBank - Punching sysadmins since WinNT.",
+        "CraxBank - Punching sysadmins since WinNT 3.51",
         "CraxBank - Brought to you by caffeine and regrets.",
         "CraxBank - Running on spite and printf().",
         "CraxBank - We have no idea what we're doing either.",
@@ -142,6 +149,62 @@ const char* get_random_tagline() {
     return taglines[rand() % count];
 }
 
+/* Helper to read CPU stats from /proc/stat */
+void read_cpu_stats(unsigned long long *user, unsigned long long *nice,
+                    unsigned long long *system, unsigned long long *idle) {
+    FILE* file = fopen("/proc/stat", "r");
+    if (!file) return;
+
+    char buffer[1024];
+    fgets(buffer, sizeof(buffer), file);
+    sscanf(buffer, "cpu  %llu %llu %llu %llu", user, nice, system, idle);
+    fclose(file);
+}
+
+double get_cpu_usage() {
+    unsigned long long user1, nice1, system1, idle1;
+    unsigned long long user2, nice2, system2, idle2;
+
+    read_cpu_stats(&user1, &nice1, &system1, &idle1);
+    usleep(100000); // Give it 100ms between
+    read_cpu_stats(&user2, &nice2, &system2, &idle2);
+
+    // Prevent negative deltas (paranoia mode - decided I needed some error handling)
+    if (idle2 < idle1 || user2 < user1 || nice2 < nice1 || system2 < system1)
+        return -1.0;
+
+    unsigned long long total1 = user1 + nice1 + system1 + idle1;
+    unsigned long long total2 = user2 + nice2 + system2 + idle2;
+
+    unsigned long long idle_delta = idle2 - idle1;
+    unsigned long long total_delta = total2 - total1;
+
+    if (total_delta == 0) return -1.0;
+
+    return (100.0 * (total_delta - idle_delta)) / total_delta;
+}
+
+
+/*
+ *Trying something here - unsure if it will work
+ * It worked! not quiet as bad as I thought!
+ * - Shane
+ */
+void print_disk_usage(const char *mount) {
+    struct statvfs buf;
+    if (statvfs(mount, &buf) != 0) return;
+
+    unsigned long total = buf.f_blocks * buf.f_frsize;
+    unsigned long available = buf.f_bavail * buf.f_frsize;
+    unsigned long used = total - available;
+    double percent = (double)used / total * 100;
+
+    printf("Disk Usage (%s)            : %.2f GiB / %.2f GiB (%.1f%%)\n",
+           mount,
+           used / (1024.0 * 1024 * 1024),
+           total / (1024.0 * 1024 * 1024),
+           percent);
+}
 
 // Function to execute a command and get its output
 char* execute_command(const char* command) {
@@ -193,22 +256,54 @@ long long read_meminfo(const char* key) {
     return value;
 }
 
+/*
+ * Wanted to add a little pizazz to things you have to remember
+ * I'm from BBS and IRC days, I like this shit :P
+ * - Shane
+*/
 char* get_de_info() {
-    FILE* fp;
-    char output[256];
+    if (system("pgrep -x cinnamon > /dev/null 2>&1") == 0)
+        return strdup("🍬 Cinnamon — slick and spicy.");
 
-    if (system("pgrep -x cinnamon > /dev/null 2>&1") == 0) {
-        fp = popen("cinnamon --version", "r");
-        if (fp && fgets(output, sizeof(output), fp)) {
-            strtok(output, "\n");
-            pclose(fp);
-            return strdup(output); // Cinnamon 5.6.8
-        }
-    }
-    // Add other DEs (gnome-shell, plasma, etc)
+    if (system("pgrep -x gnome-shell > /dev/null 2>&1") == 0)
+        return strdup("🐚 GNOME — polished, posh, and memory-hungry.");
 
-    return "Unknown";
+    if (system("pgrep -x plasmashell > /dev/null 2>&1") == 0)
+        return strdup("🔮 Plasma — sci-fi nerd's dream DE.");
+
+    if (system("pgrep -x mate-session > /dev/null 2>&1") == 0)
+        return strdup("🍵 MATE — retro vibes, modern soul.");
+
+    if (system("pgrep -x xfce4-session > /dev/null 2>&1") == 0)
+        return strdup("🪶 XFCE — light as a feather, sharp as a tack.");
+
+    if (system("pgrep -x lxqt-session > /dev/null 2>&1") == 0)
+        return strdup("🚀 LXQt — stripped down and rocket fast.");
+
+    if (system("pgrep -x gala > /dev/null 2>&1") == 0)
+        return strdup("🏛️ Pantheon — elegance from elementary school.");
+
+    if (system("pgrep -x enlightenment_start > /dev/null 2>&1") == 0)
+        return strdup("🌒 Enlightenment — dark, sleek, and strange.");
+
+    if (system("pgrep -x openbox > /dev/null 2>&1") == 0)
+        return strdup("📦 Openbox — minimalism perfected.");
+
+    if (system("pgrep -x fluxbox > /dev/null 2>&1") == 0)
+        return strdup("🌀 Fluxbox — fast, lightweight, old-school cool.");
+
+    if (system("pgrep -x i3 > /dev/null 2>&1") == 0)
+        return strdup("🔳 i3 — tiling like a boss.");
+
+    if (system("pgrep -x sway > /dev/null 2>&1") == 0)
+        return strdup("🌿 Sway — Wayland i3, modern and mean.");
+
+    if (system("pgrep -x bspwm > /dev/null 2>&1") == 0)
+        return strdup("🧱 BSPWM — tiled to perfection.");
+
+    return strdup("🤷 Unknown — mysterious like a ninja.");
 }
+
 
 char* get_terminal_info() {
     static char terminal[256];
@@ -514,20 +609,29 @@ if (argc > 1 && (strcmp(argv[1], "-l337") == 0 || strcmp(argv[1], "-1337") == 0)
     srand(time(NULL));
     int q = rand() % (sizeof(bbom_quotes) / sizeof(bbom_quotes[0]));
 
-    printf("\n💀 CraxFetch // 1337 MODE 💀\n");
-    printf("Big Book Quote           : %s\n", bbom_quotes[q]);
-    printf("Tracing route to localhost [127.0.0.1]...\n\n");
-    printf("  1    <1 ms    <1 ms    <1 ms  craxrouter.local\n");
-    printf("  2    1337 ms  666 ms  404 ms  middleman.crax [10.66.6.6]\n");
-    printf("  3    *        *       *       Request timed out.\n");
-    printf("  4    0 ms     1 ms    0 ms    root@localhost\n\n");
-    printf("Connection stabilized. Logging into CraxBank mainframe...\n");
+	printf("\n");
+
+	printf("███████ ██████  ██     ██████   ██████  ██    ██\n");
+        printf("██      ██   ██ ██    ██       ██    ██ ██    ██\n");
+        printf("█████   ██████  ██    ██   ███ ██    ██ ██    ██\n");
+        printf("██      ██   ██ ██    ██    ██ ██    ██  ██  ██\n");
+        printf("██      ██████  ██ ██  ██████   ██████    ████\n");
+	printf("\n          💀 CraxFetch // 1337 MODE 💀\n");
+	printf("Big Book Quote           : %s\n", bbom_quotes[q]);
+	printf("Tracing route to fbi.gov [104.16.148.244]...\n\n");
+	printf("  1    <1 ms    <1 ms    <1 ms  craxrouter.local\n");
+	printf("  2    1337 ms  666 ms  404 ms  middleman.crax [10.66.6.6]\n");
+	printf("  3    *        *       *       Request timed out.\n");
+	printf("  4    0 ms     1 ms    0 ms    root@localhost\n\n");
+	printf("Connection stabilized. Logging into CraxBank mainframe...\n");
 
     // Fake prompt
-    printf("\nroot@CraxBank:~# ACCESS GRANTED\n");
-    printf("Welcome back, operative.\n");
-    printf("Uplink status: 🔒 Encrypted\n");
-    printf("Proceed with discretion...\n\n");
+	printf("\nroot@CraxBank:~# ACCESS GRANTED\n");
+	printf("Welcome back, operative.\n");
+        printf("Uplink status: 🔒 Encrypted\n");
+        printf("Proceed with discretion...\n\n");
+        printf(">> Hidden Node Accessed: CRAX-NEXUS\n");
+        printf(">> Downloading forbidden archives... [██████████] Complete.\n\n");
 
     return 0;
 }
@@ -586,23 +690,26 @@ if (argc > 1 && (strcmp(argv[1], "-l337") == 0 || strcmp(argv[1], "-1337") == 0)
         if (len > 0 && trimmed_uptime[len - 1] == '\n') {
             trimmed_uptime[len - 1] = '\0';
         }
-        printf("Uptime                    : %s\n", trimmed_uptime);
+        printf("Uptime                    : %s without you crashing the system\n", trimmed_uptime);
         free(uptime);
     } else {
-        printf("Uptime                    : Unknown\n");
+        printf("Uptime                    : Unknown time without you crashing the system\n");
     }
 
 /* Start new code */
 
         printf("Shell                     : %s\n", get_shell_info());
-        printf("Desktop Envirnment        : %s\n", get_de_info());
+        char* de_info = get_de_info();
+        printf("Desktop Environment       : %s\n", de_info);
+        free(de_info);
+      //  printf("Desktop Envirnment        : %s\n", get_de_info());
         printf("Terminal                  : %s\n", get_terminal_info());
 
 /* End new code */
 
-    // CPU Information
+    /* CPU Information
     char* cpu_model = get_cpu_model();
-    int cpu_cores = get_cpu_cores();
+   int cpu_cores = get_cpu_cores();
 
     if (cpu_model) {
         printf("CPU                       : %s", cpu_model);
@@ -615,6 +722,37 @@ if (argc > 1 && (strcmp(argv[1], "-l337") == 0 || strcmp(argv[1], "-1337") == 0)
     } else {
         printf("CPU                       : Unknown\n");
     }
+
+        double cpu_usage = get_cpu_usage();
+        printf("CPU Usage                 : %.1f%%\n", cpu_usage); */
+
+// CPU Information
+char* cpu_model = get_cpu_model();
+int cpu_cores = get_cpu_cores();
+double cpu_usage = get_cpu_usage();
+
+if (cpu_model) {
+    printf("CPU                       : %s", cpu_model);
+
+    if (cpu_cores > 0) {
+        printf(" (%d Cores", cpu_cores);
+    } else {
+        printf(" (Cores: Unknown");
+    }
+
+    // Add CPU usage if valid
+    if (cpu_usage >= 0.0) {
+        printf(", %.1f%% Usage", cpu_usage);
+    }
+
+    printf(")\n");
+    free(cpu_model);
+} else {
+    printf("CPU                       : Unknown\n");
+}
+
+
+	print_disk_usage("/");
 
 // RAM Information
 long long mem_total_kb = read_meminfo("MemTotal:");
@@ -631,7 +769,6 @@ if (mem_total_kb > 0 && mem_available_kb >= 0) {
 } else {
     printf("RAM                       : Unknown\n");
 }
-
 
 
        printf("Motto of the Day          : %s\n", moods[rand() % 5]);
@@ -653,6 +790,32 @@ if (runs % 7 == 0) {
         "🔓 You cracked the code. Now solve the enigma of your life choices.",
         "There is no source. Only Zuul.",
         "System Mood: 'I know what you did with that fork bomb.'",
+        "Access Level: Ghost in the Shell, budget edition.",
+        "You just pinged Skynet. It pinged back.",
+        "🕳️ Welcome to the rabbit hole. No exit found.",
+        "Easter Egg: You've exceeded your daily quota of 'what ifs'.",
+        "💾 Loading... sarcasm.sys (100%)",
+        "Welcome back to CompuServe: press Ctrl+Alt+Del to continue.",
+        "Currently broadcasting over 300 baud. Please hold.",
+        "You've entered the acoustic coupler frequency. Speak clearly.",
+        "You smell that? That's ozone and CRTs, baby.",
+        "You just tripped the 'What Did You Touch?' alert.",
+        "Sysadmin status: drinking coffee and regretting granting you sudo.",
+        "Your permissions were revoked by the Office of No Fun.",
+        "Logs show you tried 'rm -rf /' last night. Denied. Again.",
+        "This Easter egg is procedurally generated from regret.",
+        "Alert: Self-awareness threshold exceeded. Please reboot.",
+        "Error 404: Witty response not found.",
+        "This message is stored in plaintext in your dreams.",
+        "A signal just bounced off Saturn. Your move.",
+        "The pattern is repeating. You just can't see it yet.",
+        "Your keystrokes triggered an old Cold War protocol.",
+        "Hidden daemon detected... it’s watching **you**.",
+        "Nothing was logged. Especially not *that*.",
+        "Encryption level: ‘Hollywood’ grade. Uncrackable.",
+        "Your data has been sold to aliens for caffeine.",
+        "You're totally safe. Trust me, I'm a binary.",
+
     };
 
     // Pick one at random
