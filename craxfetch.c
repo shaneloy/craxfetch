@@ -772,8 +772,9 @@ if (mem_total_kb > 0 && mem_available_kb >= 0) {
 
 
        printf("Motto of the Day          : %s\n", moods[rand() % 5]);
+
 int runs = get_run_count();
-if (runs % 7 == 0) {
+if (runs % 3 == 0) {
     const char* easter_eggs[] = {
         "You’ve unlocked 7th layer madness.",
         "Welcome back, elite one. Try not to get caught this time.",
@@ -821,7 +822,7 @@ if (runs % 7 == 0) {
     // Pick one at random
     srand(time(NULL)); // seed RNG
     int index = rand() % (sizeof(easter_eggs) / sizeof(easter_eggs[0]));
-    printf("Easter Egg                : \"%s\"\n", easter_eggs[index]);
+    printf("CraxBank Wisdom           : \"%s\"\n", easter_eggs[index]);
 }
 
 
