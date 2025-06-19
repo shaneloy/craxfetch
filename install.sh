@@ -1,9 +1,10 @@
+#!/bin/bash
+
 #############################################################
 ###                   ▛▘▛▘▀▌▚▘▜▘█▌▜▘▛▘▛▌                  ###
 ###                   ▙▖▌ █▌▞▖▐ ▙▖▐▖▙▖▌▌                  ###
 ###################CraxFetch Install Script##################
 
-#!/bin/bash
 
 # Reset color
 Color_Off='\033[0m'
@@ -68,6 +69,12 @@ install_from_git() {
         return 1
     fi
 
+    # Add Compiler Check
+    if ! command -v gcc &> /dev/null; then
+        printf "${Red}Error: C compiler (gcc) not found. Please install gcc to build from source.${Color_Off}\n"
+        return 1
+    fi
+
     echo "Cloning the $REPO_NAME repository..."
     git clone --depth 1 "$REPO_URL" "$REPO_DIR"
     if [ $? -ne 0 ]; then
@@ -75,9 +82,20 @@ install_from_git() {
         return 1
     fi
 
-    # Check if the source install script exists (adjust path if needed)
+    # Compile the C source
+    echo "Compiling $BINARY_NAME from source..."
+    if gcc "$REPO_DIR/craxfetch.c" -o "$REPO_DIR/$BINARY_NAME" -Wall; then
+        echo "Compilation successful."
+    else
+        printf "${Red}Error: Compilation of craxfetch.c failed.${Color_Off}\n"
+        rm -rf "$REPO_DIR" # Clean up cloned repo
+        return 1
+    fi
+
+    # Check if the compiled binary exists
     if [ ! -f "$SOURCE_INSTALL_SCRIPT" ]; then
-        printf "${Red}Error: $BINARY_NAME script not found in the cloned repository at $SOURCE_INSTALL_SCRIPT.${Color_Off}\n"
+        printf "${Red}Error: Compiled binary $BINARY_NAME not found at $SOURCE_INSTALL_SCRIPT after compilation.${Color_Off}\n"
+        rm -rf "$REPO_DIR" # Clean up cloned repo
         return 1
     fi
 
@@ -133,7 +151,7 @@ printf "${Purple}
 ${Color_Off}\n"
 printf "Yay! Craxfetch has been successfully installed to ${Green}$INSTALL_PATH${Color_Off}.\n"
 printf "You can now run it by typing: ${Green}craxfetch${Color_Off}\n"
-printf "For a full list of commands: ${green}craxfetch -h${Color_off}\n"
+printf "For a full list of commands: ${Green}craxfetch -h${Color_Off}\n"
 
 fi
 exit 0

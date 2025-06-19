@@ -1,9 +1,11 @@
 /*
  *
  * CraxFetch - I wanted to do something like neo/fastfetch, as it's been a long time
- * and programming has changed so much since I used to do it - Shane Loy (DayTripper)
- * Find me on IRC: AustNet: #Lismore
+ * and programming has changed so much since I used to do it - Shane Loy (DayTripper/Raz/Raz2000)
+ * Find me on IRC: AustNet: #Lismore (DayTripper)
+ * Efnet: #CraxBank (Raz)
  * Email: shane_loy@hotmail.com
+ * WWW: https://crax.serveirc.com
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -31,10 +33,11 @@
 #include <pwd.h>
 #include <limits.h>
 #include <sys/types.h>
+#include <sys/stat.h> // Required for mkdir
 #include <sys/statvfs.h>
 
 /* Defines live here */
-#define CRAXFETCH_VERSION "CraxFetch-v0.1-alpha - CraxBank Edition" /* Thinking of protecting this or adding something else so I know it's my base */
+#define CRAXFETCH_VERSION "CraxFetch-v0.1 - CraxBank Edition" /* Thinking of protecting this or adding something else so I know it's my base */
 //#define CRAXFETCH_CREATOR "Shane (DayTripper) Austnet #Lismore"
 #define RED "\033[0;31m"
 #define RESET   "\033[0m"
@@ -43,8 +46,8 @@
 #define YELLOW  "\033[33m"
 #define BLUE    "\033[34m"
 #define MAGENTA "\033[35m"
-#define RESET "\033[0m"
-#define RUN_COUNT_FILE "/tmp/.craxfetch_count"
+// #define RESET "\033[0m" // Removed duplicate
+#define RUN_COUNT_FILE "/tmp/.craxfetch_count" // This will be replaced by logic in get_run_count
 
 const char* moods[] = {
 /*
@@ -107,8 +110,8 @@ const char* moods[] = {
  */
 const char* get_random_tagline() {
     static const char* taglines[] = {
-	"Coded with confusion. Compiled with despair. Debugged with profanity."
-	"Sponsored by the Ministry of Bad Decisions™."
+	"Coded with confusion. Compiled with despair. Debugged with profanity.",
+	"Sponsored by the Ministry of Bad Decisions™.",
 	"CraxBank – Spawning child processes like rabbits.",
 	"CraxBank – Powered by forgotten root passwords.",
 	"CraxBank – Because chmod 777 solves everything.",
@@ -145,7 +148,7 @@ const char* get_random_tagline() {
     };
 
     size_t count = sizeof(taglines) / sizeof(taglines[0]);
-    srand(time(NULL));  // Seed randomizer
+    // srand(time(NULL)); // Removed from here, moved to main
     return taglines[rand() % count];
 }
 
@@ -330,22 +333,23 @@ char* get_terminal_info() {
 
                 if (!is_shell) {
                     // Map common terminals to pretty names
-                    if (strcmp(terminal, "gnome-terminal-") == 0 || strcmp(terminal, "gnome-terminal-server") == 0)
-                        return "GNOME Terminal";
-                    if (strcmp(terminal, "xfce4-terminal") == 0)
-                        return "XFCE4 Terminal";
-                    if (strcmp(terminal, "konsole") == 0)
-                        return "Konsole";
-                    if (strcmp(terminal, "tilix") == 0)
-                        return "Tilix";
-                    if (strcmp(terminal, "alacritty") == 0)
-                        return "Alacritty";
-                    if (strcmp(terminal, "xterm") == 0)
-                        return "Xterm";
-                    if (strcmp(terminal, "kitty") == 0)
-                        return "Kitty";
-                    if (strcmp(terminal, "wezterm") == 0)
-                        return "WezTerm";
+
+    if (strcmp(terminal, "gnome-terminal-") == 0 || strcmp(terminal, "gnome-terminal-server") == 0)
+        return "🦦 GNOME Terminal — tries hard, eats RAM.";
+    if (strcmp(terminal, "xfce4-terminal") == 0)
+        return "🪶 XFCE4 Terminal — lightweight and no-nonsense.";
+    if (strcmp(terminal, "konsole") == 0)
+        return "🧪 Konsole — KDE science project gone right.";
+    if (strcmp(terminal, "tilix") == 0)
+        return "🧱 Tilix — the modular beast.";
+    if (strcmp(terminal, "alacritty") == 0)
+        return "⚡ Alacritty — fast as hell, config from hell.";
+    if (strcmp(terminal, "xterm") == 0)
+        return "📼 Xterm — still here, still ancient.";
+    if (strcmp(terminal, "kitty") == 0)
+        return "🐱 Kitty — GPU-purr-formance terminal.";
+    if (strcmp(terminal, "wezterm") == 0)
+        return "🧙 WezTerm — wizard-tier terminal emulator.";
 
                     return terminal;  // Return raw name if unknown
                 }
@@ -483,22 +487,68 @@ int get_cpu_cores() {
 }
 
 int get_run_count() {
-    const char* home = getenv("HOME");
-    char path[512];
-    snprintf(path, sizeof(path), "%s/.cf_run_count", home);
+    const char* home_dir = getenv("HOME");
+    if (!home_dir) {
+        fprintf(stderr, "Error: HOME environment variable not set.\n");
+        return 0;
+    }
 
-    FILE* file = fopen(path, "r+");
+    char cache_dir_path[PATH_MAX];
+    snprintf(cache_dir_path, sizeof(cache_dir_path), "%s/.cache", home_dir);
+
+    // Check/create .cache directory
+    struct stat st_cache;
+    if (stat(cache_dir_path, &st_cache) == -1) {
+        if (mkdir(cache_dir_path, 0700) != 0) {
+            perror("Error creating .cache directory");
+            return 0;
+        }
+    } else if (!S_ISDIR(st_cache.st_mode)) {
+        fprintf(stderr, "Error: %s is not a directory.\n", cache_dir_path);
+        return 0;
+    }
+
+    char craxfetch_dir_path[PATH_MAX];
+    snprintf(craxfetch_dir_path, sizeof(craxfetch_dir_path), "%s/.cache/craxfetch", home_dir);
+
+    // Check/create .cache/craxfetch directory
+    struct stat st_craxfetch;
+    if (stat(craxfetch_dir_path, &st_craxfetch) == -1) {
+        if (mkdir(craxfetch_dir_path, 0700) != 0) {
+            perror("Error creating .cache/craxfetch directory");
+            return 0;
+        }
+    } else if (!S_ISDIR(st_craxfetch.st_mode)) {
+        fprintf(stderr, "Error: %s is not a directory.\n", craxfetch_dir_path);
+        return 0;
+    }
+
+    char count_file_path[PATH_MAX];
+    snprintf(count_file_path, sizeof(count_file_path), "%s/.cache/craxfetch/count", home_dir);
+
+    FILE* file = fopen(count_file_path, "r+"); // Try to open for reading and writing
     int count = 0;
 
     if (file) {
-        fscanf(file, "%d", &count);
-        rewind(file);
+        if (fscanf(file, "%d", &count) != 1) {
+            count = 0; // Treat as new file if read fails
+        }
+        rewind(file); // Go back to the beginning to overwrite
     } else {
-        file = fopen(path, "w");
+        // File doesn't exist, try to create it
+        file = fopen(count_file_path, "w");
+        if (!file) {
+            perror("Error opening/creating run count file");
+            return 0; // Could not create the file
+        }
     }
 
     count++;
-    fprintf(file, "%d\n", count);
+    if (fprintf(file, "%d\n", count) < 0) {
+        perror("Error writing to run count file");
+        fclose(file);
+        return count -1; // Return previous count if write fails
+    }
     fclose(file);
 
     return count;
@@ -579,6 +629,7 @@ void print_os_info() {
     }
 }
 int main(int argc, char *argv[]) {
+    srand(time(NULL)); // Seed randomizer once at the beginning of main
 
     // Handle command-line flags
     if (argc > 1) {
@@ -603,7 +654,12 @@ if (argc > 1 && (strcmp(argv[1], "-l337") == 0 || strcmp(argv[1], "-1337") == 0)
         "“This is your sysadmin speaking. I have no idea what I'm doing.”",
         "“CraxBank: Because reality is read-only.”",
         "“Don't grep where you eat.”",
-        "“Hack the planet!” – The Hackers Handbook"
+        "“Hack the planet!” – The Hackers Handbook",
+	"“There is no patch for human stupidity.” — Kevin Mitnick",
+	"“I'm in.” — Every hacker movie ever",
+	"“root@your_dreams:~# rm -rf /fear”",
+	"“Real hackers grep in /dev/null”",
+	"“Ghost in the shell script.”"
     };
 
     srand(time(NULL));
@@ -611,14 +667,16 @@ if (argc > 1 && (strcmp(argv[1], "-l337") == 0 || strcmp(argv[1], "-1337") == 0)
 
 	printf("\n");
 
-	printf("███████ ██████  ██     ██████   ██████  ██    ██\n");
-        printf("██      ██   ██ ██    ██       ██    ██ ██    ██\n");
-        printf("█████   ██████  ██    ██   ███ ██    ██ ██    ██\n");
-        printf("██      ██   ██ ██    ██    ██ ██    ██  ██  ██\n");
-        printf("██      ██████  ██ ██  ██████   ██████    ████\n");
+	printf("  _______                  _______  _______  _______ \n");
+	printf(" |   _   .----.---.-.--.--|   _   \\|   _   \\|   _   |\n");
+	printf(" |.  1___|   _|  _  |_   _|.  1   /|.  1   /|   1___|\n");
+	printf(" |.  |___|__| |___._|__.__|.  _   \\|.  _   \\|____   |\n");
+	printf(" |:  1   |                |:  1    |:  1    |:  1   |\n");
+	printf(" |::.. . |                |::.. .  |::.. .  |::.. . |\n");
+	printf(" `-------'                `-------'`-------'`-------'\n");
 	printf("\n          💀 CraxFetch // 1337 MODE 💀\n");
 	printf("Big Book Quote           : %s\n", bbom_quotes[q]);
-	printf("Tracing route to fbi.gov [104.16.148.244]...\n\n");
+	printf("Dialing into CraxBank BBS WHQ [+61 666]...\n\n");
 	printf("  1    <1 ms    <1 ms    <1 ms  craxrouter.local\n");
 	printf("  2    1337 ms  666 ms  404 ms  middleman.crax [10.66.6.6]\n");
 	printf("  3    *        *       *       Request timed out.\n");
@@ -653,14 +711,14 @@ if (argc > 1 && (strcmp(argv[1], "-l337") == 0 || strcmp(argv[1], "-1337") == 0)
            "    ░ ░         ░           ░  ░ ░    ░   ░            ░  ░         ░ ░  ░    \n"
            "    ░                                          ░                              \n\n");
     printf("                " CYAN "%s" RESET "\n\n", get_random_tagline());
-
+//    printf("┌────────────────────────────────────────────────────────────────────────────────────────────────┐\n");
     // User Logged in @ Hostname
     pw = getpwuid(getuid());
     if (pw) {
-        printf("User Logged in            : %s@%s\n\n", pw->pw_name, hostname);
+        printf("User Logged in            : %s@%s\n", pw->pw_name, hostname);
     } else {
         perror("getpwuid failed");
-        printf("User Logged in            : Unknown@%s\n\n", hostname);
+        printf("User Logged in            : Unknown@%s\n", hostname);
     }
 
     // Operating System with Distro
@@ -680,21 +738,26 @@ if (argc > 1 && (strcmp(argv[1], "-l337") == 0 || strcmp(argv[1], "-1337") == 0)
         printf("Linux Kernel              : Unknown\n");
     }
 
-    // Uptime
-    char* uptime = execute_command("uptime -p");
-    if (uptime) {
-        // Remove the "up " prefix
+// Uptime
+char* uptime = execute_command("uptime -p");
+if (uptime) {
+    // Make sure the string starts with "up "
+    if (strncmp(uptime, "up ", 3) == 0) {
         char* trimmed_uptime = uptime + 3;
-        // Remove the trailing newline character if present
         size_t len = strlen(trimmed_uptime);
         if (len > 0 && trimmed_uptime[len - 1] == '\n') {
             trimmed_uptime[len - 1] = '\0';
         }
         printf("Uptime                    : %s without you crashing the system\n", trimmed_uptime);
-        free(uptime);
     } else {
-        printf("Uptime                    : Unknown time without you crashing the system\n");
+        // Fallback if format isn't as expected
+        printf("Uptime                    : %s (weird format, but hey, still running!)\n", uptime);
     }
+    free(uptime);
+} else {
+    printf("Uptime                    : Dude, you've crashed so much I've lost count!\n");
+}
+
 
 /* Start new code */
 
@@ -751,6 +814,35 @@ if (cpu_model) {
     printf("CPU                       : Unknown\n");
 }
 
+void print_gpu_info() {
+    FILE *fp;
+    char path[1035];
+    char gpu_info[1035] = "";
+
+    // Run lspci and grep for VGA/3D/Display controllers
+    fp = popen("lspci | grep -i 'vga' | cut -d':' -f3 | sed 's/^ //'", "r");
+    if (fp == NULL) {
+        printf("GPU                       : Not available\n");
+        return;
+    }
+
+    while (fgets(path, sizeof(path)-1, fp) != NULL) {
+        strcat(gpu_info, path);
+    }
+
+    pclose(fp);
+
+    // Trim leading spaces/tabs
+    char *gpu_trimmed = gpu_info;
+    while (*gpu_trimmed == ' ' || *gpu_trimmed == '\t') gpu_trimmed++;
+
+    // Clean newlines at the end
+    gpu_trimmed[strcspn(gpu_trimmed, "\n")] = 0;
+
+    printf("GPU                       : %s\n", gpu_trimmed);
+}
+
+	print_gpu_info();
 
 	print_disk_usage("/");
 
@@ -771,10 +863,11 @@ if (mem_total_kb > 0 && mem_available_kb >= 0) {
 }
 
 
-       printf("Motto of the Day          : %s\n", moods[rand() % 5]);
+       printf("Motto of the Day          : %s\n", moods[rand() % (sizeof(moods)/sizeof(moods[0]))]);
 
 int runs = get_run_count();
-if (runs % 3 == 0) {
+// Set runs to 1 while testing - may forget to change it back
+if (runs > 0 && runs % 1 == 0) { // Check runs > 0 in case get_run_count returned an error
     const char* easter_eggs[] = {
         "You’ve unlocked 7th layer madness.",
         "Welcome back, elite one. Try not to get caught this time.",
@@ -820,11 +913,10 @@ if (runs % 3 == 0) {
     };
 
     // Pick one at random
-    srand(time(NULL)); // seed RNG
     int index = rand() % (sizeof(easter_eggs) / sizeof(easter_eggs[0]));
-    printf("CraxBank Wisdom           : \"%s\"\n", easter_eggs[index]);
+    printf("CraxBank Wisdom           : %s\n", easter_eggs[index]);
 }
-
+//  printf("└────────────────────────────────────────────────────────────────────────────────────────────────┘\n");
 
     return 0;
 }
