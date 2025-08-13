@@ -186,7 +186,45 @@ double get_cpu_usage() {
 
     return (100.0 * (total_delta - idle_delta)) / total_delta;
 }
+char* get_host_model() {
+    FILE *fp;
+    static char host_model[256] = "Unknown";
 
+    fp = popen("cat /sys/devices/virtual/dmi/id/product_name", "r");
+    if (fp) {
+        if (fgets(host_model, sizeof(host_model), fp) != NULL) {
+            // Trim newline
+            host_model[strcspn(host_model, "\n")] = 0;
+        }
+        pclose(fp);
+    }
+    return host_model;
+}
+void print_cpu_temp() {
+    FILE *fp;
+    char line[256];
+
+    fp = popen("sensors", "r");
+    if (!fp) {
+        printf("CPU Temp                  : Unable to read sensors\n");
+        return;
+    }
+
+    while (fgets(line, sizeof(line), fp)) {
+        if (strstr(line, "Package id 0:")) {
+            char *temp_start = strchr(line, '+');
+            if (temp_start) {
+                temp_start[strcspn(temp_start, "\n")] = 0;  // Trim newline
+                printf("CPU Temp                  : %s\n", temp_start);
+                pclose(fp);
+                return;
+            }
+        }
+    }
+
+    pclose(fp);
+    printf("CPU Temp                  : Not found\n");
+}
 
 /*
  *Trying something here - unsure if it will work
@@ -572,7 +610,18 @@ void print_os_info() {
                 }
                 strncpy(distro, name, sizeof(distro));
             }
-            if (strncmp(line, "VERSION_ID=", 11) == 0) {
+
+            if (strncmp(line, "VERSION=", 8) == 0) {
+                char *ver = line + 8;
+                ver[strcspn(ver, "\n")] = 0;
+                if (*ver == '"' || *ver == '\'') {
+                    ver++;
+                    ver[strlen(ver) - 1] = 0;
+                }
+                strncpy(version, ver, sizeof(version));
+            }
+
+            if (version[0] == '\0' && strncmp(line, "VERSION_ID=", 11) == 0) {
                 char *ver = line + 11;
                 ver[strcspn(ver, "\n")] = 0;
                 if (*ver == '"' || *ver == '\'') {
@@ -586,6 +635,7 @@ void print_os_info() {
     }
 
     // Add spice here
+    // Add spice here
     const char *emoji = "💻"; // Default emoji
     const char *nickname = distro; // Default nickname
 
@@ -595,34 +645,46 @@ void print_os_info() {
     } else if (strstr(distro, "Debian")) {
         emoji = "🧱";
         nickname = "Debian (solid as a rock)";
-    } else if (strstr(distro, "Ubuntu")) {
-        emoji = "🟣";
-        nickname = "Ubuntu (the friendly fork)";
+    } else if (strstr(distro, "Endeavour")) {
+        emoji = "🚀";
+        nickname = "EndeavourOS (Arch with a space suit)";
     } else if (strstr(distro, "Fedora")) {
         emoji = "🎩";
         nickname = "Fedora (classy & bleeding edge)";
-    } else if (strstr(distro, "Red Hat")) {
-        emoji = "🔴";
-        nickname = "Red Hat (enterprisey as hell)";
     } else if (strstr(distro, "Gentoo")) {
         emoji = "🧬";
         nickname = "Gentoo (compile 'til you die)";
-    } else if (strstr(distro, "Void")) {
-        emoji = "🕳️";
-        nickname = "Void (edge lords only)";
+    } else if (strstr(distro, "Kali")) {
+        emoji = "🎭";
+        nickname = "Kali Linux (hacker cosplay)";
+    } else if (strstr(distro, "Manjaro")) {
+        emoji = "🌿";
+        nickname = "Manjaro (Arch with training wheels)";
+    } else if (strstr(distro, "Parrot")) {
+        emoji = "🦜";
+        nickname = "Parrot OS *squaaaaak*";
+    } else if (strstr(distro, "Red Hat")) {
+        emoji = "🔴";
+        nickname = "Red Hat (enterprisey as hell)";
     } else if (strstr(distro, "Slackware")) {
         emoji = "📼";
         nickname = "Slackware (old school kung fu)";
+    } else if (strstr(distro, "Ubuntu")) {
+        emoji = "🟣";
+        nickname = "Ubuntu (the friendly fork)";
+    } else if (strstr(distro, "Void")) {
+        emoji = "🕳️";
+        nickname = "Void (edge lords only)";
     } else if (strstr(distro, "openSUSE")) {
         emoji = "🦎";
         nickname = "openSUSE (green mean machine)";
     }
 
+
     struct utsname uname_data;
     if (uname(&uname_data) == 0) {
-        printf("Operating System          : %s %s %s (%s %s)\n",
-               emoji, nickname, version,
-               uname_data.sysname, uname_data.release);
+        printf("Operating System          : %s %s %s\n",
+               emoji, nickname, version);
     } else {
         perror("uname failed");
         printf("Operating System          : %s %s %s\n", emoji, nickname, version);
@@ -770,6 +832,7 @@ if (uptime) {
 
 /* End new code */
 
+
     /* CPU Information
     char* cpu_model = get_cpu_model();
    int cpu_cores = get_cpu_cores();
@@ -788,6 +851,8 @@ if (uptime) {
 
         double cpu_usage = get_cpu_usage();
         printf("CPU Usage                 : %.1f%%\n", cpu_usage); */
+
+printf("Host Hardware             : %s\n", get_host_model());
 
 // CPU Information
 char* cpu_model = get_cpu_model();
@@ -813,7 +878,7 @@ if (cpu_model) {
 } else {
     printf("CPU                       : Unknown\n");
 }
-
+print_cpu_temp();
 void print_gpu_info() {
     FILE *fp;
     char path[1035];
